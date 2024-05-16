@@ -6,7 +6,7 @@ The multichannel virtual sensing active noise control (MVANC) methodology is an 
 ### Key MATLAB Files
 - [`CreatReferenceSignal.m`](#function-creatreferencesignal): This code is utilized to generates the filtered reference signals and disturbances.
 - [`MultichannelFxLMS.m`](#function-multichannelfxlms): The code of the multichannel filterd reference least mean sqaure (McFxLMS) algorithm.
-- [`AuxiliaryLMS.m`]: The code is used to obtain the auxiliary filters.
+- [`AuxiliaryLMS.m`](#function-auxiliarylms): The code is used to obtain the auxiliary filters.
 - [`ContrFxLMS.m`]: The code of the control stage of the virtual sensing ANC. 
 - [`VirtualSensing_test.m`]: The main testing program of the vritual ANC codes. 
 
@@ -93,3 +93,103 @@ end
 end
 ```
 In this code snippet, $W$ is used to store the optimal control filters trained using the FxLMS algorithm and has a dimension of $K$ by $L$, where $L$ denotes the length of the control filter. $Er$ is used to store the error signals at virtual microphones and has a dimension of $M$ by $N$.
+
+## Function: AuxiliaryLMS
+After the control filter converges, the optimal control filters are then used by `AuxiliaryLMS.m` to train the auxiliary filters using the LMS algorithm.
+
+```matlab
+function [H,Er]=AuxiliaryLMS(L,K,J,N,Fx_p,Dp,PriNoise,W,StepSize)
+%% -----------------------------------------------------------
+% Inputs:
+% L is the length of control filter.
+% K is the number of secondary source.
+% J is the number of physical microphones. 
+% N is the number of simulation cycle.
+% Fx_p is the reference signal filtered by physical secondary path.
+% Dp is the disturbance at physical microphone.
+% W is the optimal control filter matrix.
+% StepSize is the stepsize of LMS algorithm.
+% Outputs:
+% H is the auxiliary filter matrix.
+% Er is the error signal of LMS algorithm.
+%% -----------------------------------------------------------
+H  = zeros(J*L,1); 
+SH = zeros(J*L,1); 
+FX = zeros(J,K*L); 
+YH = zeros(J,1); % The output signal of the auxiliary fitler.
+Er = zeros(J,N)  ;
+X  = [zeros(L-1,1); PriNoise];
+for i = 1:N
+    for j = 1:J
+        for kk = 1:K 
+            FX(j,(kk-1)*L+1:kk*L) = Fx_p(i+L-1:-1:i,j,kk)';
+        end
+        YH(j) =  X(i+L-1:-1:i)'*H((j-1)*L+1:j*L);
+    end
+    Ep = Dp(i,:)'-FX*W; % The error signal at physical microphone.
+    Eh = Ep - YH;
+    for j = 1:J
+        SH((j-1)*L+1:j*L) = StepSize*Eh(j)*X(i+L-1:-1:i);
+    end
+    H = H + SH;
+    Er(:,i) = Eh;
+end
+end
+```
+
+In this code snippet, $H$ is used to store the optimal auxiliary filters trained using the LMS algorithm and has a dimension of $J$ by $L$. $Er$ is used to store the error signals and has a dimension of $J$ by $N$.
+
+## Function: ContrFxLMS
+
+In the control stage of the MVANC technique, the optimal auxiliary filers are used by `ContrFxLMS.m` to train the new control filters using the FxLMS algorithm.
+
+```matlab
+function [WC,ErPhysic,ErVirt] = ContrFxLMS(L,K,M,J,N,Fx_p,Fx_v,Dp,Dv,PriNoise,H,StepSize) 
+%% ------------------------------------------------------------------------
+% Inputs:
+% L is the length of control filter.
+% K is the number of secondary source.
+% M is the number of virtual microphones. 
+% J is the number of physical microphones. 
+% N is the number of simulation cycle.
+% Fx_p is the reference signal filtered by physical secondary path.
+% Fx_v is the reference signal filtered by virtual secondary path. 
+% Dp is the disturbance at physical microphone.
+% Dv is the disturbance at virtual microphone.
+% H is the optimal auxiliary filter matrix.
+% StepSize is the stepsize of FxLMS algorithm.
+% Outputs:
+% WC is the new control filter matrix.
+% ErPhysic is the error signal at physical microphone.
+% ErVirt is the error signal at virtual microphone.
+%% ------------------------------------------------------------------------
+FX = zeros(J,K*L);
+FV = zeros(M,K*L);
+WC = zeros(K*L,1); 
+ErPhysic = zeros(J,N); 
+ErVirt   = zeros(M,N); 
+XH       = zeros(N,J);
+for i = 1:J 
+    XH(:,i) = filter(H((i-1)*L+1:i*L),1,PriNoise);
+end
+for i=1:N
+    for j = 1:J
+        for kk = 1:K 
+            FX(j,(kk-1)*L+1:kk*L) = Fx_p(i+L-1:-1:i,j,kk)';
+        end
+    end
+    for j = 1:M
+        for kk = 1:K 
+            FV(j,(kk-1)*L+1:kk*L) = Fx_v(i+L-1:-1:i,j,kk)';
+        end
+    end
+    Ep      = Dp(i,:)' - FX*WC; 
+    ErVirt(:,i) = Dv(i,:)' - FV*WC; 
+    Eh      = Ep-XH(i,:)';
+    WC      = WC + (StepSize*Eh'*FX)';
+    ErPhysic(:,i) = Ep;
+end
+end
+```
+
+In this code snippet, $WC$ is used to store the new control filters trained using the FxLMS algorithm and has a dimension of $K$ by $L$. $ErPhysic$ is used to store the error signals at physical microphones which have a dimension of $J$ by $N$, while $ErVirt$ is used to store the error signals at virtual microphones which have a dimension of $M$ by $N$.
