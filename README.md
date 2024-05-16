@@ -7,8 +7,8 @@ The multichannel virtual sensing active noise control (MVANC) methodology is an 
 - [`CreatReferenceSignal.m`](#function-creatreferencesignal): This code is utilized to generates the filtered reference signals and disturbances.
 - [`MultichannelFxLMS.m`](#function-multichannelfxlms): The code of the multichannel filterd reference least mean sqaure (McFxLMS) algorithm.
 - [`AuxiliaryLMS.m`](#function-auxiliarylms): The code is used to obtain the auxiliary filters.
-- [`ContrFxLMS.m`]: The code of the control stage of the virtual sensing ANC. 
-- [`VirtualSensing_test.m`]: The main testing program of the vritual ANC codes. 
+- [`ContrFxLMS.m`](#function-contrfxlms): The code of the control stage of the virtual sensing ANC. 
+- [`VirtualSensing_test.m`](#testing-code-four-channel-virtual-sensing-active-nose-control-system): The main testing program of the vritual ANC codes. 
 
 ## Function: CreatReferenceSignal
 The MVANC technique utilizes the FxLMS algorithm to adaptively update the control filter coefficients. Therefore, <font color=blue>`CreatReferenceSignal.m`</font> generates the reference signals filtered by the physical secondary path and the virtual secondary path respectively. In addition, it produces disturbances at the location of the physical microphone and virtual microphone respectively. These signals will later be used in other functions.
@@ -193,3 +193,120 @@ end
 ```
 
 In this code snippet, $WC$ is used to store the new control filters trained using the FxLMS algorithm and has a dimension of $K$ by $L$. $ErPhysic$ is used to store the error signals at physical microphones which have a dimension of $J$ by $N$, while $ErVirt$ is used to store the error signals at virtual microphones which have a dimension of $M$ by $N$.
+
+## Testing Code: Four Channel Virtual Sensing Active Nose Control System
+
+The `VirtualSensing_test.m` carries out a simulation on a 1x4x4 MVANC system, where there is $1$ reference microphone, $4$ secondary sources, $4$ physical microphones and $4$ virtual microphones. In the simulation, `CreatReferenceSignal.m`, `MultichannelFxLMS.m`, `AuxiliaryLMS.m` and `ContrFxLMS.m` are used to achieve noise control at desired virtual locations.
+
+### System Configuration
+
+The following commands define basic system configuration parameters. Specifically, the sampling frequency of the system is set to 16 kHz and the length of control filters is set to 512 taps.
+
+```matlab
+Fs         = 16000       ; % System sampling freqnecy (Hz).
+T          = 50          ; % The duration of the simutation (Second).
+t          = 0:1/Fs:T    ; % The cycle of simulation. 
+N          = length(t)   ; % The number of cycle of simulation. 
+L          = 512         ; % The lenght of the control filter. 
+K          = 4           ; % The number of the seconeary sources. 
+J          = 4           ; % The number of the physical microphones.
+M          = 4           ; % The number of the virtual microphones.
+```
+
+### Creating Primary Noise for Tuning and Control
+
+The following commands generate a broadband noise of 800-2500 Hz as reference signals in the tuning stage and a broadband noise of 800-1800 Hz as reference signals in the control stage by filtering white noise through different bandpass filters.
+
+```matlab
+Fs1_tuning  = 800;
+Fs2_tuning  = 2500;
+ws1_tuning  = 2*(Fs1_tuning/Fs);
+ws2_tuning  = 2*(Fs2_tuning/Fs);
+BPF_tuning = fir1(512,[ws1_tuning,ws2_tuning]);
+PriNoise_tuning = filter(BPF_tuning,1,2*randn(N,1));
+% Creating primary noise for control.
+Fs1_control  = 800;
+Fs2_control  = 1800;
+ws1_control  = 2*(Fs1_control/Fs);
+ws2_control  = 2*(Fs2_control/Fs);
+BPF_control = fir1(512,[ws1_control,ws2_control]);
+PriNoise_control = filter(BPF_control,1,2*randn(N,1));
+```
+
+### Loading Primary and Secondary Paths
+
+The primary path is the path that the noise takes from the noise source to the error microphone, and the secondary path is the path that the anti-noise takes from the secondary source to the error microphone. Both of these paths are essential to the detection of errors. As a result, physical paths are distinct from virtual paths due to the fact that the physical microphones and virtual microphones are situated in distinct locations. In this context, the primary paths and the secondary paths are loaded from files.The length of the primary paths is 128 and the length of the secondary paths is 32.
+
+```matlab
+% Load physical primary and secondary path.
+Pp = load('PrimaryPath_P_4.mat').Pp;
+Sp = load('PhysicalPath16.mat').Sp;
+% Load virtual primary and secondary path.
+Pv = load('PrimaryPath_V_4.mat').Pv;
+Sv = load('VirtualPath16.mat').Sv;
+```
+
+### Creating Disturbances and Filtered-Reference Signals
+
+The following commands generate disturbance signals by filtering the reference signal through the primary path and filtered reference signals by filtering the reference signal through the secondary path. Specifically, different disturbance and filtered reference signals are generated with primary noises in the tuning and control stages, respectively.
+
+```matlab
+% Creating disturbances and filtered reference signals for tuning noise.
+[Dv_tuning,Dp_tuning,Fx_v_tuning,Fx_p_tuning] = CreatReferenceSignal(Pv,Pp,Sv,Sp,PriNoise_tuning,N,L,K,M,J);
+% Creating disturbances and filtered reference signals for control noise.
+[Dv_control,Dp_control,Fx_v_control,Fx_p_control] = CreatReferenceSignal(Pv,Pp,Sv,Sp,PriNoise_control,N,L,K,M,J);
+```
+
+### Tuning Stage 1: Training the Optimal Control Filters
+
+The following commands train the optimal control filters using the FxLMS algorithm with a stepsize of 0.000001.
+
+```matlab
+u1 = 0.000001; % Stepsize of the FxLMS algorithm.
+[W,Er] = MultichannelFxLMS(L,K,M,N,Fx_v_tuning,Dv_tuning,u1);
+```
+
+### Tuning Stage 2: Training the Auxiliary Filters
+The following commands train the auxiliary filters using the LMS algorithm with a stepsize of 0.001.
+
+```matlab
+u2 = 0.001; % Stepsize of the LMS algorithm.
+[H,Er] = AuxiliaryLMS(L,K,J,N,Fx_p_tuning,Dp_tuning,PriNoise_tuning,W,u2);
+```
+
+### Control Stage: Training the New Control Filters
+
+The following commands train the new control filters using the FxLMS algorithm with a stepsize of 0.00001.
+
+```matlab
+u3 = 0.00001; % Stepsize of the FxLMS algorithm.
+[WC,Er,Ev] = ContrFxLMS(L,K,M,J,N,Fx_p_control,Fx_v_control,Dp_control,Dv_control,PriNoise_control,H,u3);
+```
+
+### Drawing the Figure of Error Signals
+
+Drawing the error signals of the four virtual microphones.
+
+```matlab
+set(groot,'defaultAxesTickLabelInterpreter','latex');
+figure  
+plot(10*log10(smooth(Ev(1,:).^2,2048,'moving')))
+hold on
+plot(10*log10(smooth(Ev(2,:).^2,2048,'moving')))
+hold on 
+plot(10*log10(smooth(Ev(3,:).^2,2048,'moving')))
+hold on
+plot(10*log10(smooth(Ev(4,:).^2,2048,'moving')))
+xlim([0 800001])
+ylim([-45 0])
+xlabel('Iterations','Interpreter','latex')
+ylabel('Square Error (dB)','Interpreter','latex')
+title('Time history of error signal at virtual microphones','Interpreter','latex')
+legend('Error signal at virtual microphone 1','Error signal at virtual microphone 2','Error signal at virtual microphone 3','Error signal at virtual microphone 4','Interpreter','latex')
+grid on
+```
+
+![figure5](Image/5.jpg)  
+Fiure 5. Simulated error signals at four virtual microphones of the MVANC system.
+
+It can be seen from Figure 5 that the MVANC system can achieve noise control at the virtual locations and the noise reduction performance is around 40 dB. 
