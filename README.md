@@ -2,6 +2,11 @@
 ## Introduction
 The multichannel virtual sensing active noise control (MVANC) methodology is an advanced approach that may provide a wide area of silence at specific virtual positions that are distant from the physical error microphones. Currently, there is a scarcity of open-source programs available for the MVANC algorithm. This work presents a MATLAB code for the MVANC approach, utilizing the multichannel filtered-x least mean square (MCFxLMS) algorithm. The code is designed to be applicable to systems with any number of channels.
 
+
+ <img src="Image/VS.jpg" height = "400" alt="图片名称" align=center />   
+ 
+ Figure 1: The multi-channel feedforward active noise control (ANC) window with the virtual microphones. This system is targeted to project the quiet zone from the physical microphones' location $\textcolor{red}{\mathbf{P}}$ to the location $\textcolor{blue}{\mathbf{V}}$ of the virtual microphones.
+
 ## Code Explanation
 ### Key MATLAB Files
 - [`CreatReferenceSignal.m`](#function-creatreferencesignal): This code is utilized to generates the filtered reference signals and disturbances.
