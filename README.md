@@ -310,3 +310,48 @@ grid on
 Fiure 5. Simulated error signals at four virtual microphones of the MVANC system.
 
 It can be seen from Figure 5 that the MVANC system can achieve noise control at the virtual locations and the noise reduction performance is around 40 dB. 
+
+### Drawing the Figure of Control Filter Coefficient
+
+Drawing the control filter 1 coefficients in both tuning and control stages. The remaining three control filters are very similar to control filter 1.
+
+```matlab
+figure 
+subplot(1,2,1)
+plot(1:L,W(1:L),1:L,WC(1:L))
+grid on
+xlabel('Taps','Interpreter','latex')
+ylabel('${{\bf{w}}_{11}}$','Interpreter','latex')
+legend('Control filter 1 in the tuning stage','Control filter 1 in the control stage','Interpreter','latex')
+xlim([0,512])
+subplot(1,2,2)
+[H, F] = freqz(W(1:L), 1, 1024, Fs);
+plot(F, abs(H));
+hold on
+[H, F] = freqz(WC(1:L), 1, 1024, Fs);
+plot(F, abs(H));
+grid on
+xlim([0,3000])
+xlabel('Frequency (Hz)','Interpreter','latex')
+ylabel('$|{W_{11}}(f)|$','Interpreter','latex')
+```
+
+![Figure 6](Image/6.jpg)  
+Figur 6. Simulated control filter 1 coefficients of the MVANC system.
+
+It can be seen from Figure 6 that the control filter 1 derived from the tuning stage exhibits a passband within the 800 to 2500 Hz
+frequency range. Conversely, control filter 1 from the control stage demonstrates a passband within the narrower 800 to 1800 Hz range. This result is consistent with the different primary noises used in the tuning and control stages.
+
+## Reference 
+``` bibtex
+@article{shi2020feedforward,
+  title={Feedforward multichannel virtual-sensing active control of noise through an aperture: Analysis on causality and sensor-actuator constraints},
+  author={Shi, Dongyuan and Gan, Woon-Seng and Lam, Bhan and Hasegawa, Rina and Kajikawa, Yoshinobu},
+  journal={The Journal of the Acoustical Society of America},
+  volume={147},
+  number={1},
+  pages={32--48},
+  year={2020},
+  publisher={AIP Publishing}
+}
+```
