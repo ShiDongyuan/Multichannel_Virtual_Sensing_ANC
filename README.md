@@ -342,6 +342,9 @@ Figur 6. Simulated control filter 1 coefficients of the MVANC system.
 It can be seen from Figure 6 that the control filter 1 derived from the tuning stage exhibits a passband within the 800 to 2500 Hz
 frequency range. Conversely, control filter 1 from the control stage demonstrates a passband within the narrower 800 to 1800 Hz range. This result is consistent with the different primary noises used in the tuning and control stages.
 
+## Summary 
+The purpose of this readme is to provide a comprehensive explanation of a MATLAB program that simulates the feedforward multichannel virtual sensing active noise control (MVANC) technique by employing the multichannel filtered-x least mean square (MCFxLMS) technique. 
+
 ## Reference 
 ``` bibtex
 @article{shi2020feedforward,
