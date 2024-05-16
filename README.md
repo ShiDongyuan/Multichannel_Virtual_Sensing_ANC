@@ -5,7 +5,7 @@ The multichannel virtual sensing active noise control (MVANC) methodology is an 
 ## Code Explanation
 ### Key MATLAB Files
 - [`CreatReferenceSignal.m`](#function-creatreferencesignal): This code is utilized to generates the filtered reference signals and disturbances.
-- [`MultichannelFxLMS.m`](#the-explanation-of-multichannel_fxlmsm): The code of the multichannel filterd reference least mean sqaure (McFxLMS) algorithm.
+- [`MultichannelFxLMS.m`](#function-multichannelfxlms): The code of the multichannel filterd reference least mean sqaure (McFxLMS) algorithm.
 - [`AuxiliaryLMS.m`]: The code is used to obtain the auxiliary filters.
 - [`ContrFxLMS.m`]: The code of the control stage of the virtual sensing ANC. 
 - [`VirtualSensing_test.m`]: The main testing program of the vritual ANC codes. 
@@ -56,4 +56,40 @@ end
 end
 ```
 
-In this code snippet, $Dv$ is used to store the disturbances at virtual microphones and has a dimension of $N$ by $M$, while $Dp$ is used to store the disturbances at physical microphones and has a dimension of $N$ by $J$. In addition, $Fx\_v$ is used to store the reference signals filtered by virtual secondary paths and has a dimension of $N$ by $M$ by $K$, while $Fx\_p$ is used to store the reference signals filtered by virtual secondary paths and has a dimension of $N$ by $J$ by $K$. $N$, $M$, $J$ and $K$ denote the simulation cycle number, the number of virtual error microphones, the number of physical error microphones and the number of secondary sources respectively.
+In this code snippet, $Dv$ is used to store the disturbances at virtual microphones and has a dimension of $N$ by $M$, while $Dp$ is used to store the disturbances at physical microphones and has a dimension of $N$ by $J$. In addition, $Fx\\_v$ is used to store the reference signals filtered by virtual secondary paths and has a dimension of $N$ by $M$ by $K$, while $Fx\\_p$ is used to store the reference signals filtered by virtual secondary paths and has a dimension of $N$ by $J$ by $K$. $N$, $M$, $J$ and $K$ denote the simulation cycle number, the number of virtual error microphones, the number of physical error microphones and the number of secondary sources respectively.
+
+## Function: MultichannelFxLMS
+In the tuning stage of the MVANC technique, the optimal control filters are first trained by `MultichannelFxLMS.m` using the FxLMS algorithm.
+
+```matlab
+function [W,Er]= MultichannelFxLMS(L,K,M,N,Fx_v,Dv,StepSize)
+%% -----------------------------------------------------------
+% Inputs:
+% L is the length of control filter.
+% K is the number of secondary sources.
+% M is the number of virtual microphones. 
+% N is the number of simulation cycles.
+% Fx_v is the reference signal filtered by virtual secondary path. 
+% Dv is the disturbance at virtual microphone.
+% StepSize is the stepsize of FxLMS algorithm.
+% Outputs:
+% W is the control filter matrix.
+% Er is the error signal at virtual microphone.
+%% -----------------------------------------------------------
+W  = zeros(K*L,1); 
+FX = zeros(M,K*L); 
+Er = zeros(M,N); 
+for i = 1:N
+    for j = 1:M
+        for kk= 1:K
+            FX(j,(kk-1)*L+1:kk*L) = Fx_v(i+L-1:-1:i,j,kk)';
+        end
+    end
+    Ev = Dv(i,:)'- FX*W;
+    SX = StepSize*Ev'*FX;
+    W  = W + SX';
+    Er(:,i) = Ev;
+end
+end
+```
+In this code snippet, $W$ is used to store the optimal control filters trained using the FxLMS algorithm and has a dimension of $K$ by $L$, where $L$ denotes the length of the control filter. $Er$ is used to store the error signals at virtual microphones and has a dimension of $M$ by $N$.
